@@ -1,0 +1,344 @@
+---
+title: 'Dietary Diveristy Analysis'
+output: pdf_document
+date: "2024-06-13"
+---
+```{r}
+library(foreign)
+library(haven)
+data <- read_dta("/Users/tiffanyhu/Downloads/Dietary Diversity_Tanzania.dta")
+
+# Load necessary libraries
+library(dplyr)
+library(ggplot2)
+library(GGally)
+library(reshape2)
+
+# Summary statistics for the entire dataset
+summary(data)
+
+# Summary statistics for specific variables
+summary(data$HDDS)
+summary(data$Age_head)
+summary(data$land_size_ha)
+summary(data$Household_size)
+
+# Check for missing values
+missing_values <- sapply(data, function(x) sum(is.na(x)))
+missing_values
+
+# Visualize missing values
+library(VIM)
+aggr(data, col=c('navyblue','red'), numbers=TRUE, sortVars=TRUE, labels=names(data), cex.axis=.7, gap=3, ylab=c("Missing data","Pattern"))
+
+# Distribution of HDDS
+ggplot(data, aes(x=HDDS)) +
+  geom_histogram(binwidth=1, fill="blue", color="black") +
+  theme_minimal() +
+  labs(title="Distribution of HDDS", x="HDDS", y="Frequency")
+
+# Distribution of Age_head
+ggplot(data, aes(x=Age_head)) +
+  geom_histogram(binwidth=5, fill="green", color="black") +
+  theme_minimal() +
+  labs(title="Distribution of Age of Household Head", x="Age", y="Frequency")
+
+# Distribution of land_size_ha
+ggplot(data, aes(x=land_size_ha)) +
+  geom_histogram(binwidth=1, fill="purple", color="black") +
+  theme_minimal() +
+  labs(title="Distribution of Land Size (ha)", x="Land Size (ha)", y="Frequency")
+
+# Bar plot for categorical variables
+ggplot(data, aes(x=off_farm)) +
+  geom_bar(fill="orange", color="black") +
+  theme_minimal() +
+  labs(title="Distribution of Off-farm Income", x="Off-farm Income", y="Count")
+
+ggplot(data, aes(x=grow_vegetables)) +
+  geom_bar(fill="cyan", color="black") +
+  theme_minimal() +
+  labs(title="Distribution of Vegetable Growing", x="Grow Vegetables", y="Count")
+
+ggplot(data, aes(x=Gender_head)) +
+  geom_bar(fill="pink", color="black") +
+  theme_minimal() +
+  labs(title="Distribution of Gender of Household Head", x="Gender", y="Count")
+
+# Correlation matrix for numerical variables
+colnames(data)
+numeric_vars <- cbind(age = data$Age_head, land_size = data$land_size_ha, household_size = data$Household_size)
+
+cor_matrix <- cor(numeric_vars)
+cor_matrix
+
+# Visualize the correlation matrix
+ggcorr(numeric_vars, label = TRUE, label_alpha = TRUE)
+
+
+# Scatter plot of HDDS vs Age_head
+ggplot(data, aes(x=Age_head, y=HDDS)) +
+  geom_point(color="blue") +
+  geom_smooth(method="lm", color="red") +
+  theme_minimal() +
+  labs(title="HDDS vs Age of Household Head", x="Age of Household Head", y="HDDS")
+
+# Scatter plot of HDDS vs land_size_ha
+data <- data %>% mutate(land_size_ha = log(land_size_ha + 1))
+ggplot(data, aes(x=land_size_ha, y=HDDS)) +
+  geom_point(color="green") +
+  geom_smooth(method="lm", color="red") +
+  theme_minimal() +
+  labs(title="HDDS vs Land Size", x="Land Size (ha)", y="HDDS")
+
+# Box plot of HDDS by off_farm
+ggplot(data, aes(x=off_farm, y=HDDS)) +
+  geom_boxplot(fill="orange", color="black") +
+  theme_minimal() +
+  labs(title="HDDS by Off-farm Income", x="Off-farm Income", y="HDDS")
+
+# Box plot of HDDS by grow_vegetables
+ggplot(data, aes(x=grow_vegetables, y=HDDS)) +
+  geom_boxplot(fill="cyan", color="black") +
+  theme_minimal() +
+  labs(title="HDDS by Growing Vegetables", x="Grow Vegetables", y="HDDS")
+
+# Box plot of HDDS by Gender_head
+ggplot(data, aes(x=Gender_head, y=HDDS)) +
+  geom_boxplot(fill="pink", color="black") +
+  theme_minimal() +
+  labs(title="HDDS by Gender of Household Head", x="Gender of Household Head", y="HDDS")
+
+```
+
+
+
+
+```{r}
+
+
+library(dplyr)
+data <- data %>% select(Region, district, Village, Household_size, educationF, Age_head, grow_vegetables, Food_nutrition, Gender_head, land_size_ha, off_farm, HDDS)
+
+
+#basic transformations
+data <- data %>%
+  mutate(
+     Region = as.factor(Region),
+    district = as.factor(district),
+    Village = as.factor(Village),
+    Gender_head = as.factor(Gender_head),
+    grow_vegetables = as.factor(grow_vegetables),
+    off_farm = as.factor(off_farm),
+    Food_nutrition = as.factor(Food_nutrition)
+    
+  )
+
+
+data$Age_head <- as.numeric(data$Age_head)
+data$Household_size <- as.numeric(data$Household_size)
+data <- data %>%
+  mutate(Age_head = cut(Age_head, breaks = c(0, 18, 35, 50, 65, Inf), labels = c("0-18", "19-35", "36-50", "51-65", "66+")))
+data <- data %>% mutate(Household_size = cut(Household_size, breaks = c(0, 2, 4, 6, Inf), labels = c("1-2", "3-4", "5-6", "7+")))
+data <- data %>% mutate(land_size_ha = log(land_size_ha + 1))
+
+
+#Many levels of the variable Village, try grouping the levels
+data <- data %>%
+  mutate(Village = case_when(
+    Village %in% c(6,  4,  3,  8, 11) ~ "Group1",
+    Village %in% c(2,  1, 12,  9, 14) ~ "Group2",
+    Village %in% c(13, 19,  7, 16, 17) ~ "Group3",
+    Village %in% c(20, 10, 15,  5, 18) ~ "Group4",
+  ))
+
+data$Village <- as.factor(data$Village)
+
+
+
+
+# Load necessary libraries
+library(MASS) # for the stepAIC function
+library(glmnet) # for Lasso
+library(rstanarm)
+library(loo)
+
+
+
+# Fit the initial Poisson model with all predictors
+poisson_model <- stan_glm(HDDS ~ Region + district + Village + Household_size + educationF + Age_head + grow_vegetables + Food_nutrition + Gender_head + land_size_ha + off_farm, 
+                     data = data, family = poisson(),
+                        chains = 4, iter = 2000, warmup = 500, cores = 4)
+
+nb_model <- stan_glm(HDDS ~ Region + district + Village + Household_size + educationF + Age_head + grow_vegetables + Food_nutrition + Gender_head + land_size_ha + off_farm, 
+                        
+                     data = data, 
+                            family = neg_binomial_2,
+                        chains = 4, iter = 2000, warmup = 500, cores = 4)
+
+# Compute LOO for both models
+loo_poisson <- loo(poisson_model)
+loo_nb <- loo(nb_model)
+
+# Print LOO summary
+print(loo_poisson)
+print(loo_nb)
+
+# Compare models using LOOIC
+loo_compare(loo_poisson, loo_nb)
+#choose negative binomial
+
+# # Install and load the glmmTMB package
+# install.packages("glmmTMB")
+# library(glmmTMB)
+# 
+# # Prepare the formula
+# formula <- HDDS ~ Region + district + Village + Household_size + educationF + Age_head + grow_vegetables + Food_nutrition + Gender_head + land_size_ha + off_farm
+# 
+# # Fit the Negative Binomial model
+# nb_model <- glmmTMB(formula, data = data, family = nbinom2, na.action = na.fail)
+# 
+# # Summary of the model
+# summary(nb_model)
+# 
+# # Initial Exploration
+# summary(data)
+
+# Correlation matrix for numeric predictors
+cor_matrix <- cor(data[sapply(data, is.numeric)])
+print(cor_matrix) #no collinearity issues
+
+library(glmnet)
+
+# Prepare the design matrix
+x <- model.matrix(HDDS ~ ., data = data)[, -1]
+y <- data$HDDS
+
+# Fit the Lasso model
+lasso_model <- cv.glmnet(x, y, family = "poisson", alpha = 1)
+
+# Plot the cross-validation results to select the best lambda
+plot(lasso_model)
+
+# Get the coefficients of the best model
+selected_coeffs <- coef(lasso_model, s = "lambda.min")
+print(selected_coeffs)
+
+# Extract the names of the selected features
+selected_features <- rownames(selected_coeffs)[selected_coeffs[, 1] != 0]
+selected_features <- selected_features[selected_features != "(Intercept)"]
+print(selected_features)
+
+# Create the final formula with selected features
+selected_formula <- HDDS ~ Village + educationF + Food_nutrition + land_size_ha + Household_size + Gender_head + Age_head
+
+
+
+library(rstanarm)
+library(loo)
+library(bayesplot)
+library(bayesplot)
+library(glmnet)
+library(caret)
+library(dplyr)
+
+
+
+# Fit the Negative Binomial model with different priors
+
+# Adjust the sampling settings
+sampling_settings <- list(
+  adapt_delta = 0.99,  # Increase adapt_delta to reduce divergent transitions
+  max_treedepth = 15   # Increase max_treedepth to allow for more thorough exploration
+)
+
+# Fit the Negative Binomial model with different priors
+
+# Normal prior
+model_normal <- stan_glm(selected_formula, data = data, 
+                            family = poisson, 
+                            prior = normal(0, 1), prior_intercept = normal(0, 1),
+                            chains = 4, iter = 2000, warmup = 500, cores = 4)
+                               
+
+# Cauchy prior
+model_cauchy <- stan_glm(selected_formula, data = data, 
+                            family = poisson, 
+                            prior = cauchy(0, 2.5), prior_intercept = cauchy(0, 2.5),
+                            chains = 4, iter = 2000, warmup = 500, cores = 4)
+                          
+
+# Lasso prior
+model_lasso <- stan_glm(selected_formula, data = data, 
+                           family = poisson, 
+                           prior = laplace(0, 1), prior_intercept = normal(0, 1),
+                           chains = 4, iter = 2000, warmup = 500, cores = 4)
+
+#Non-informative Prior
+model_noninformative <- stan_glm(selected_formula, data = data, 
+                           family = poisson, 
+                           prior = NULL, prior_intercept = NULL,
+                           chains = 4, iter = 2000, warmup = 500, cores = 4)
+
+                           
+
+# Summarize models
+summary(model_normal)
+summary(model_cauchy)
+summary(model_lasso)
+summary(model_noninformative)
+
+
+
+
+
+# Compute LOO-CV for all models
+loo_normal <- loo(model_normal)
+loo_cauchy <- loo(model_cauchy)
+loo_noninformative <- loo(model_noninformative)
+loo_lasso <- loo(model_lasso)
+
+# Compare models using LOOIC
+loo_comparison <- loo_compare(loo_normal, loo_cauchy, loo_noninformative, loo_lasso)
+print(loo_comparison)
+
+# Compute WAIC for all models
+waic_normal <- waic(model_normal)
+waic_cauchy <- waic(model_cauchy)
+waic_noninformative <- waic(model_noninformative)
+waic_lasso <- waic(model_lasso)
+
+# Compare models using WAIC
+waic_comparison <- loo_compare(waic_normal, waic_cauchy, waic_noninformative, waic_lasso)
+print(waic_comparison)
+
+# Extract Pareto k diagnostic values for all models
+pareto_k_values_normal <- loo::pareto_k_table(loo_normal)
+pareto_k_values_cauchy <- loo::pareto_k_table(loo_cauchy)
+pareto_k_values_horseshoe<- loo::pareto_k_table(loo_noninformative)
+pareto_k_values_lasso <- loo::pareto_k_table(loo_lasso)
+
+print(pareto_k_values_normal)
+print(pareto_k_values_cauchy)
+print(pareto_k_values_noninformative)
+print(pareto_k_values_lasso)
+
+
+
+# # Posterior predictive distribution for the best model
+# # Assuming nb_model_normal is better based on LOO and WAIC
+# yrep_horseshoe <- posterior_predict(nb_model_horseshoe)
+# yrep_lasso <- posterior_predict(nb_model_lasso)
+# 
+# 
+# # Plot posterior predictive distribution
+# ppc_dens_overlay(y = as.vector(data$HDDS), yrep = yrep_horseshoe[1:200, ])
+# ppc_dens_overlay(y = as.vector(data$HDDS), yrep = yrep_lasso[1:200, ])
+
+# Summarize the best model
+# summary(nb_model_horseshoe)
+# summary(nb_model_lasso)
+
+
+
+```
