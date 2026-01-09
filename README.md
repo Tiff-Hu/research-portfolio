@@ -19,5 +19,5 @@ Folder: `voting-predictors/`
 
 ## Contact
 Tiffany Hu  
-Email: eve9031bruin@g.ucla.edu
-LinkedIn: https://www.linkedin.com/in/tiffany-hu-career1101/
+Email: eve9031bruin@g.ucla.edu  
+LinkedIn: www.linkedin.com/in/tiffany-hu-career1101
